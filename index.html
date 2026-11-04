@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reny ❤️</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Quicksand:wght@400;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--pink:#e7a2a6;--red:#a93438;--cream:#fffaf7;--ink:#4b3434}
+*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#fff7f5,#fbe9e8);color:var(--ink);font-family:Quicksand,sans-serif}
+header{text-align:center;padding:36px 16px 20px}h1{font:700 clamp(42px,8vw,72px) 'Playfair Display',serif;margin:0;color:#9c3039;letter-spacing:2px}
+header p{margin:8px 0 0;color:#9b7777}.toolbar{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;padding:0 12px 24px}
+button,.btn{border:0;border-radius:22px;background:#a93438;color:white;padding:10px 16px;font:600 14px Quicksand;cursor:pointer}button.secondary{background:#fff;color:#96343a;border:1px solid #e7b7b8}
+#loginBox{display:none;max-width:360px;margin:0 auto 20px;padding:18px;background:white;border-radius:14px;box-shadow:0 8px 25px #6b33331a}
+#loginBox input{width:100%;padding:11px;margin:6px 0;border:1px solid #e3caca;border-radius:8px;font:inherit}
+#status{text-align:center;font-size:13px;margin:8px;color:#7e5656}
+main{max-width:1100px;margin:auto;padding:10px 18px 60px;display:grid;grid-template-columns:repeat(auto-fit,minmax(245px,1fr));gap:26px}
+.entry{display:flex;flex-direction:column;align-items:center}.date{font:700 20px 'Playfair Display',serif;margin-bottom:10px;color:#96343a}
+.polaroid{width:100%;max-width:300px;background:#fff;padding:12px 12px 48px;box-shadow:0 7px 18px #4d1c1c22;transform:rotate(var(--tilt));position:relative;border-radius:2px}
+.photo{width:100%;aspect-ratio:1/1;background:#111;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative}
+.photo img{width:100%;height:100%;object-fit:cover}.photo .empty{color:#aaa;font-size:12px;text-align:center;padding:10px}
+.heart{position:absolute;right:17px;bottom:12px;color:#b32f34;font:32px 'Playfair Display',serif;transform:rotate(-12deg)}
+.controls{display:flex;flex-wrap:wrap;gap:5px;justify-content:center;margin-top:12px}.controls button{font-size:12px;padding:8px 11px}
+.caption{margin-top:10px;width:100%;max-width:300px;text-align:center;color:#936b6b;font-size:13px}
+.caption input{width:100%;border:1px solid #e7caca;border-radius:8px;padding:8px;background:#fffaf7;font:inherit;text-align:center}
+footer{text-align:center;padding:30px;color:#a17c7c}
+@media(max-width:600px){main{gap:24px}.polaroid{max-width:320px}}
+</style>
+</head>
+<body>
+<header><h1>Reny</h1><p>Un recuerdo por cada sábado ❤️</p></header>
+<div class="toolbar">
+<button id="adminBtn">Acceso administrador</button>
+<button class="secondary" id="logoutBtn" style="display:none">Cerrar sesión</button>
+</div>
+<div id="loginBox">
+<input id="email" type="email" placeholder="Correo administrador">
+<input id="password" type="password" placeholder="Contraseña" autocomplete="current-password">
+<button id="loginBtn">Iniciar sesión</button>
+<button class="secondary" id="cancelLogin">Cancelar</button>
+<div id="loginMessage"></div>
+</div>
+<div id="status">Cargando recuerdos…</div>
+<main id="album"></main>
+<footer>Hecho con cariño para Reny ❤️</footer>
+<script>
+const SUPABASE_URL = "https://yfhfilrmiprpwcyravug.supabase.co";
+const SUPABASE_KEY = "sb_publishable_s6rq9jk1kAiGUQ-VdeT8Qw_npZbqenR";
+const BUCKET = "reny-fotos";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+let session = null;
+const dates = [];
+for(let d=new Date(2026,5,27); d<=new Date(2026,11,12); d.setDate(d.getDate()+7)){
+  dates.push(new Date(d.getFullYear(),d.getMonth(),d.getDate()));
+}
+const fmt = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const label = d => new Intl.DateTimeFormat('es-MX',{weekday:'long',day:'numeric',month:'long',year:'numeric'}).format(d);
+const tilt = i => (i%2===0 ? '-1.2deg':'1.1deg');
+function makeEntry(d,i){
+ const id=fmt(d);
+ const article=document.createElement('section'); article.className='entry';
+ article.innerHTML=`<div class="date">${label(d)}</div>
+ <div class="polaroid" style="--tilt:${tilt(i)}">
+   <div class="photo" id="photo-${id}"><div class="empty">Tu recuerdo de este sábado<br>❤️</div></div>
+   <div class="heart">♡</div>
+ </div>
+ <div class="caption" id="caption-${id}"></div>
+ <div class="controls admin-controls" id="controls-${id}" style="display:none">
+  <button data-upload="${id}">Agregar / cambiar foto</button>
+  <button data-delete="${id}" class="secondary">Eliminar foto</button>
+  <input type="file" accept="image/*" id="file-${id}" hidden>
+ </div>`;
+ return article;
+}
+const album=document.getElementById('album');
+dates.forEach((d,i)=>album.appendChild(makeEntry(d,i)));
+async function loadAlbum(){
+ document.getElementById('status').textContent='Cargando recuerdos…';
+ for(const d of dates){
+  const id=fmt(d);
+  const {data,error}=await supabase.storage.from(BUCKET).list(id,{limit:100});
+  const photo=document.getElementById('photo-'+id);
+  photo.innerHTML='';
+  if(!error && data && data.length){
+   const file=data.filter(x=>x.name && !x.name.startsWith('.')).sort((a,b)=>b.created_at?.localeCompare(a.created_at||'')||0)[0];
+   if(file){const {data:urlData}=supabase.storage.from(BUCKET).getPublicUrl(`${id}/${file.name}`);
+    const img=document.createElement('img');img.src=urlData.publicUrl;img.alt='Recuerdo '+label(d);photo.appendChild(img);}
+  }else photo.innerHTML='<div class="empty">Tu recuerdo de este sábado<br>❤️</div>';
+ }
+ document.getElementById('status').textContent=session?'Modo administrador activado.':'Álbum público · solo lectura';
+ document.querySelectorAll('.admin-controls').forEach(el=>el.style.display=session?'flex':'none');
+ document.getElementById('logoutBtn').style.display=session?'inline-block':'none';
+}
+document.getElementById('adminBtn').onclick=()=>{document.getElementById('loginBox').style.display='block';};
+document.getElementById('cancelLogin').onclick=()=>document.getElementById('loginBox').style.display='none';
+document.getElementById('loginBtn').onclick=async()=>{
+ const email=document.getElementById('email').value.trim(), password=document.getElementById('password').value;
+ const msg=document.getElementById('loginMessage');msg.textContent='Iniciando sesión…';
+ const {data,error}=await supabase.auth.signInWithPassword({email,password});
+ if(error){msg.textContent='No se pudo iniciar sesión: '+error.message;return;}
+ session=data.session;document.getElementById('loginBox').style.display='none';await loadAlbum();
+};
+document.getElementById('logoutBtn').onclick=async()=>{await supabase.auth.signOut();session=null;await loadAlbum();};
+album.addEventListener('click',async e=>{
+ const upload=e.target.closest('[data-upload]'), del=e.target.closest('[data-delete]');
+ if(upload){document.getElementById('file-'+upload.dataset.upload).click();}
+ if(del){
+  const id=del.dataset.delete;
+  if(!session)return alert('Inicia sesión como administrador.');
+  const {data,error}=await supabase.storage.from(BUCKET).list(id,{limit:100});
+  if(error)return alert(error.message);
+  if(data?.length){const paths=data.filter(x=>x.name&&!x.name.startsWith('.')).map(x=>`${id}/${x.name}`);
+    if(paths.length){const result=await supabase.storage.from(BUCKET).remove(paths);if(result.error)return alert(result.error.message);}
+  }
+  await loadAlbum();
+ }
+});
+dates.forEach(d=>{
+ const id=fmt(d);
+ document.getElementById('file-'+id).addEventListener('change',async e=>{
+  const file=e.target.files[0];if(!file)return;if(!session){alert('Inicia sesión primero.');return;}
+  if(!file.type.startsWith('image/')){alert('Selecciona una imagen.');return;}
+  const ext=(file.name.split('.').pop()||'jpg').replace(/[^a-z0-9]/gi,'');
+  const path=`${id}/foto-${Date.now()}.${ext}`;
+  document.getElementById('status').textContent='Subiendo foto…';
+  const {error}=await supabase.storage.from(BUCKET).upload(path,file,{cacheControl:'3600',upsert:false,contentType:file.type});
+  if(error)alert('Error al subir: '+error.message);else await loadAlbum();
+  e.target.value='';
+ });
+});
+supabase.auth.getSession().then(({data})=>{session=data.session;loadAlbum();});
+</script>
+</body>
+</html>
