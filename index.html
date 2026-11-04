@@ -78,18 +78,34 @@ const album=document.getElementById('album');
 dates.forEach((d,i)=>album.appendChild(makeEntry(d,i)));
 async function loadAlbum(){
  document.getElementById('status').textContent='Cargando recuerdos…';
- for(const d of dates){
-  const id=fmt(d);
-  const {data,error}=await supabase.storage.from(BUCKET).list(id,{limit:100});
-  const photo=document.getElementById('photo-'+id);
-  photo.innerHTML='';
-  if(!error && data && data.length){
-   const file=data.filter(x=>x.name && !x.name.startsWith('.')).sort((a,b)=>b.created_at?.localeCompare(a.created_at||'')||0)[0];
-   if(file){const {data:urlData}=supabase.storage.from(BUCKET).getPublicUrl(`${id}/${file.name}`);
-    const img=document.createElement('img');img.src=urlData.publicUrl;img.alt='Recuerdo '+label(d);photo.appendChild(img);}
-  }else photo.innerHTML='<div class="empty">Tu recuerdo de este sábado<br>❤️</div>';
+ try {
+  const results = await Promise.all(dates.map(async d=>{
+   const id=fmt(d);
+   const {data,error}=await supabase.storage.from(BUCKET).list(id,{limit:100});
+   const photo=document.getElementById('photo-'+id);
+   photo.innerHTML='';
+   if(error) {
+     photo.innerHTML='<div class="empty">No se pudo cargar<br>este recuerdo</div>';
+     return {id,error:error.message};
+   }
+   if(data && data.length){
+    const file=data.filter(x=>x.name && !x.name.startsWith('.')).sort((a,b)=>(b.created_at||'').localeCompare(a.created_at||''))[0];
+    if(file){
+      const {data:urlData}=supabase.storage.from(BUCKET).getPublicUrl(`${id}/${file.name}`);
+      const img=document.createElement('img');img.src=urlData.publicUrl;img.alt='Recuerdo '+label(d);
+      img.onerror=()=>{photo.innerHTML='<div class="empty">No se pudo mostrar la imagen</div>';};
+      photo.appendChild(img);
+    } else photo.innerHTML='<div class="empty">Tu recuerdo de este sábado<br>❤️</div>';
+   } else photo.innerHTML='<div class="empty">Tu recuerdo de este sábado<br>❤️</div>';
+   return {id};
+  }));
+  const failed=results.filter(x=>x.error);
+  document.getElementById('status').textContent=failed.length
+   ? `Álbum cargado, pero ${failed.length} fecha(s) tuvieron error. Revisa las políticas de Storage.`
+   : (session?'Modo administrador activado.':'Álbum público · solo lectura');
+ } catch(e) {
+  document.getElementById('status').textContent='Error al conectar con Supabase: '+(e.message||e);
  }
- document.getElementById('status').textContent=session?'Modo administrador activado.':'Álbum público · solo lectura';
  document.querySelectorAll('.admin-controls').forEach(el=>el.style.display=session?'flex':'none');
  document.getElementById('logoutBtn').style.display=session?'inline-block':'none';
 }
